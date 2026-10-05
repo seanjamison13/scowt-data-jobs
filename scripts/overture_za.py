@@ -106,7 +106,7 @@ def count():
         for i in range(0, len(compact), per_note):
             annotate("notice", f"{title} [{'/'.join(cols)}] " + " ; ".join(compact[i:i + per_note]))
 
-    con.create_function("prov", province, [str], str)
+    con.create_function("prov", province, [str], str, null_handling="special")
     open_filter = "coalesce(operating_status,'open') <> 'permanently_closed'"
     table("By province", f"SELECT prov(region) p, count(*) n, count(phone) with_phone, count(website) with_site, count(facebook) with_facebook FROM za WHERE {open_filter} GROUP BY 1 ORDER BY 2 DESC",
           ["Province", "Places", "With phone", "With website", "With Facebook"])
@@ -151,7 +151,7 @@ def load():
     max_rows = int(os.environ.get("MAX_ROWS") or 0)
 
     con = connect()
-    con.create_function("prov", province, [str], str)
+    con.create_function("prov", province, [str], str, null_handling="special")
     where = [f"coalesce(confidence,0) >= {min_conf}", "coalesce(operating_status,'open') <> 'permanently_closed'"]
     if not include_chains:
         where.append("NOT is_chain")
