@@ -94,12 +94,17 @@ def count():
     summary(f"## Overture South Africa, release {RELEASE}\n\nPulled in {time.time() - t0:.0f}s. "
             f"**{total:,}** named places with a South African address: {open_:,} not marked closed, {closed:,} marked permanently closed.\n")
 
-    def table(title, sql, cols):
+    annotate("notice", f"TOTAL {total} named ZA places; {open_} not closed; {closed} permanently closed; pulled in {time.time() - t0:.0f}s")
+
+    def table(title, sql, cols, per_note=70):
         rows = con.execute(sql).fetchall()
         md = f"\n### {title}\n\n| " + " | ".join(cols) + " |\n|" + "---|" * len(cols) + "\n"
         for r in rows:
             md += "| " + " | ".join(f"{v:,}" if isinstance(v, int) else ("" if v is None else str(v)) for v in r) + " |\n"
         summary(md)
+        compact = ["|".join("" if v is None else str(v) for v in r) for r in rows]
+        for i in range(0, len(compact), per_note):
+            annotate("notice", f"{title} [{'/'.join(cols)}] " + " ; ".join(compact[i:i + per_note]))
 
     con.create_function("prov", province, [str], str)
     open_filter = "coalesce(operating_status,'open') <> 'permanently_closed'"
@@ -194,5 +199,19 @@ def load():
             + ("\n\n**Stopped at the database size cap.**" if capped else ""))
 
 
+def annotate(level, msg):
+    """GitHub shows these as run annotations, readable through the API without the log files."""
+    clean = str(msg).replace("%", "%25").replace("\r", "").replace("\n", "%0A")[:3000]
+    print(f"::{level}::{clean}", flush=True)
+
+
 if __name__ == "__main__":
-    {"count": count, "load": load}[sys.argv[1] if len(sys.argv) > 1 else "count"]()
+    import traceback
+    try:
+        {"count": count, "load": load}[sys.argv[1] if len(sys.argv) > 1 else "count"]()
+    except SystemExit as e:
+        annotate("error", f"stopped: {e}")
+        raise
+    except Exception:
+        annotate("error", traceback.format_exc()[-2500:])
+        raise
